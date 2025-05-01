@@ -20,13 +20,14 @@ interface PlacedChord {
   line: number;
   pos: number;
 }
+
 interface Snapshot {
   title: string;
   blocks: string[];
   placed: PlacedChord[];
 }
 
-// —– Mappe e utilità —–
+// Mappe
 const SCALE = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"];
 const FLAT_TO_SHARP: Record<string,string> = { Db:"C#", Eb:"D#", Gb:"F#", Ab:"G#", Bb:"A#" };
 const chordMap: Record<string,string> = {
@@ -37,11 +38,13 @@ const chordMap: Record<string,string> = {
 const invChordMap = Object.entries(chordMap)
   .reduce((o,[i,ita]) => ((o[ita]=i), o), {} as Record<string,string>);
 const SUFFIXES = ["","m","7","M7","m7","sus4","dim"];
+
 function splitChord(ch:string):[string,string] {
   for (let suf of SUFFIXES) if (suf && ch.endsWith(suf))
     return [ch.slice(0,-suf.length), suf];
   return [ch, ""];
 }
+
 function transposeChord(ch:string, st:number):string {
   const [r,s] = splitChord(ch);
   const intl = invChordMap[r]||r;
@@ -54,7 +57,6 @@ function transposeChord(ch:string, st:number):string {
 }
 
 export default function ChordEditor() {
-  // Stati principali
   const [title,setTitle] = useState("Titolo canzone");
   const [blocks,setBlocks] = useState<string[]>([]);
   const [placed,setPlaced] = useState<PlacedChord[]>([]);
@@ -63,29 +65,13 @@ export default function ChordEditor() {
   const [movingIndex,setMovingIndex] = useState<number|null>(null);
   const [selectedChord,setSelectedChord] = useState<string|null>(null);
 
-  // context‐menu
   const [menuType,setMenuType] = useState<"root"|"suffix"|null>(null);
   const [menuX,setMenuX] = useState(0);
   const [menuY,setMenuY] = useState(0);
   const [menuRoot,setMenuRoot] = useState<string|null>(null);
   const clickRef = useRef<{localX:number,localY:number}|null>(null);
-
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // Auto‐save/Load da localStorage
-  useEffect(() => {
-    const saved = localStorage.getItem("chordEditorProject");
-    if (saved) {
-      try {
-        const d = JSON.parse(saved);
-        if (Array.isArray(d.blocks) && Array.isArray(d.placed)) {
-          setTitle(d.title||"");
-          setBlocks(d.blocks);
-          setPlaced(d.placed);
-        }
-      } catch {}
-    }
-  }, []);
   useEffect(() => {
     localStorage.setItem(
       "chordEditorProject",
@@ -93,11 +79,13 @@ export default function ChordEditor() {
     );
   }, [title, blocks, placed]);
 
-  // History Undo/Redo
   const makeSnapshot = ():Snapshot => ({
     title, blocks:[...blocks], placed:placed.map(c=>({ ...c }))
   });
-  const record = () => { setUndoStack(u=>[...u,makeSnapshot()]); setRedoStack([]); };
+  const record = () => {
+    setUndoStack(u=>[...u,makeSnapshot()]);
+    setRedoStack([]);
+  };
   const handleUndo = () => {
     if (!undoStack.length) return;
     const prev = undoStack[undoStack.length-1];
@@ -117,7 +105,6 @@ export default function ChordEditor() {
     setPlaced(next.placed);
   };
 
-  // Shortcut tastiera
   useEffect(() => {
     const onKey = (e:KeyboardEvent) => {
       if (e.ctrlKey && !e.shiftKey && e.key.toLowerCase()==="z") {
@@ -131,7 +118,6 @@ export default function ChordEditor() {
     return () => document.removeEventListener("keydown", onKey);
   }, [undoStack,redoStack]);
 
-  // File / Stampa / Salva / Carica
   const handleFile = async (e:React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0]; if (!f) return;
     record();
@@ -173,7 +159,6 @@ export default function ChordEditor() {
     rd.readAsText(f);
   };
 
-  // Converti / Transpose
   const convertAllItalian = () => {
     record();
     setPlaced(ps => ps.map(pc => {
@@ -195,7 +180,6 @@ export default function ChordEditor() {
     })));
   };
 
-  // Context‐menu inserimento
   const handleContextMenu = (e:React.MouseEvent) => {
     e.preventDefault();
     const ctr = containerRef.current; if (!ctr) return;
@@ -210,9 +194,11 @@ export default function ChordEditor() {
     setMenuType("root"); setMenuRoot(null);
     setMenuX(localX); setMenuY(localY);
   };
+
   const handleSelectRoot = (r:string,e:React.MouseEvent) => {
     e.stopPropagation(); setMenuRoot(r); setMenuType("suffix");
   };
+
   const handleSelectSuffix = (s:string,e:React.MouseEvent) => {
     e.stopPropagation();
     if (!menuRoot) { setMenuType(null); return; }
@@ -221,7 +207,6 @@ export default function ChordEditor() {
     document.body.style.cursor = "crosshair";
   };
 
-  // Click editor: piazza/sposta
   const onEditorClick = (e:React.MouseEvent) => {
     const ctr = containerRef.current; if (!ctr) return;
     const rect = ctr.getBoundingClientRect();
@@ -232,9 +217,7 @@ export default function ChordEditor() {
       setPlaced(ps => ps.map((c,i) => {
         if (i===movingIndex) {
           const p = ctr.querySelector(`p[data-line="${c.line}"]`) as HTMLElement|null;
-          const lockedY = p
-            ? (p.getBoundingClientRect().top - rect.top + ctr.scrollTop)
-            : c.y;
+          const lockedY = p ? (p.getBoundingClientRect().top - rect.top + ctr.scrollTop) : c.y;
           return { ...c, x: lx, y: lockedY };
         }
         return c;
@@ -263,7 +246,6 @@ export default function ChordEditor() {
     if (menuType) setMenuType(null);
   };
 
-  // Copy/move/delete chords
   const handleChordContextMenu = (ch:string)=>(e:React.MouseEvent)=>{
     e.preventDefault(); e.stopPropagation();
     setSelectedChord(ch);
@@ -281,7 +263,6 @@ export default function ChordEditor() {
     setPlaced(ps=>ps.filter((_,j)=>j!==i));
   };
 
-  // Edit inline testo
   const onEdit = (i:number,e:React.FormEvent<HTMLParagraphElement>)=>{
     record();
     const txt = e.currentTarget.textContent||"";
@@ -291,78 +272,37 @@ export default function ChordEditor() {
   return (
     <div style={{ display:"flex", height:"100vh", background:"#1e1e1e", color:"#ddd" }}>
       <aside style={{ width:240, padding:16, background:"#2b2b2b" }}>
-        {/* Titolo */}
         <div style={{ marginBottom:16 }}>
-          <label style={{ color:"#ccc", display:"block", marginBottom:4 }}>
-            Titolo:
-          </label>
+          <label style={{ color:"#ccc", display:"block", marginBottom:4 }}>Titolo:</label>
           <input
             type="text"
             value={title}
             onChange={e => setTitle(e.target.value)}
             placeholder="Titolo canzone"
             style={{
-              width:"100%",
-              padding:"6px",
-              borderRadius:4,
-              border:"1px solid #555",
-              background:"#333",
-              color:"#eee"
+              width:"100%", padding:"6px", borderRadius:4,
+              border:"1px solid #555", background:"#333", color:"#eee"
             }}
           />
         </div>
-
-        <button onClick={handleUndo} disabled={!undoStack.length} style={btnStyle}>
-          <FaUndo /> Undo
-        </button>
-        <button onClick={handleRedo} disabled={!redoStack.length} style={btnStyle}>
-          <FaRedo /> Redo
-        </button>
-
-        <div style={{ margin:"16px 0" }}/>
-
+        <button onClick={handleUndo} disabled={!undoStack.length} style={btnStyle}><FaUndo /> Undo</button>
+        <button onClick={handleRedo} disabled={!redoStack.length} style={btnStyle}><FaRedo /> Redo</button>
+        <div style={{ margin:"16px 0" }} />
         <button onClick={()=>document.getElementById("file-input")!.click()} style={btnStyle}>
           <FaFileWord /> Importa DOCX
         </button>
-        <input
-          id="file-input"
-          type="file"
-          accept=".docx"
-          onChange={handleFile}
-          style={{ display:"none" }}
-        />
-
-        <button onClick={exportPrint} style={btnStyle}>
-          <FaPrint /> Stampa
-        </button>
-        <button onClick={handleSave} style={btnStyle}>
-          <FaSave /> Salva
-        </button>
+        <input id="file-input" type="file" accept=".docx" onChange={handleFile} style={{ display:"none" }} />
+        <button onClick={exportPrint} style={btnStyle}><FaPrint /> Stampa</button>
+        <button onClick={handleSave} style={btnStyle}><FaSave /> Salva</button>
         <button onClick={()=>document.getElementById("load-input")!.click()} style={btnStyle}>
           <FaFolderOpen /> Carica
         </button>
-        <input
-          id="load-input"
-          type="file"
-          accept=".json"
-          onChange={handleLoad}
-          style={{ display:"none" }}
-        />
-
-        <button onClick={convertAllItalian} style={btnStyle}>
-          <FaLanguage /> → IT
-        </button>
-        <button onClick={convertAllInternational} style={btnStyle}>
-          <FaLanguage /> → INT
-        </button>
-
+        <input id="load-input" type="file" accept=".json" onChange={handleLoad} style={{ display:"none" }} />
+        <button onClick={convertAllItalian} style={btnStyle}><FaLanguage /> → IT</button>
+        <button onClick={convertAllInternational} style={btnStyle}><FaLanguage /> → INT</button>
         <div style={{ display:"flex", gap:8, marginTop:8 }}>
-          <button onClick={()=>transposeAll(-1)} style={btnStyleFlex}>
-            <FaMinus /> -1
-          </button>
-          <button onClick={()=>transposeAll(1)} style={btnStyleFlex}>
-            <FaPlus /> +1
-          </button>
+          <button onClick={()=>transposeAll(-1)} style={btnStyleFlex}><FaMinus /> -1</button>
+          <button onClick={()=>transposeAll(1)} style={btnStyleFlex}><FaPlus /> +1</button>
         </div>
         <div style={{ marginTop: 32, fontSize: "0.8em", color: "#888", textAlign: "center" }}>
           <p style={{ marginBottom: 4 }}>WebApp creata da un Cantore per i Cantori</p>
@@ -375,11 +315,8 @@ export default function ChordEditor() {
         onClick={onEditorClick}
         onContextMenuCapture={handleContextMenu}
         style={{
-          position:"relative",
-          flex:1,
-          padding:16,
-          overflow:"auto",
-          background:"#1e1e1e",
+          position:"relative", flex:1, padding:16,
+          overflow:"auto", background:"#1e1e1e",
           backgroundImage:"linear-gradient(rgba(255,255,255,0.05) 1px, transparent 1px)",
           backgroundSize:"100% 30px",
           cursor: movingIndex!==null ? "move" : "text"
@@ -387,16 +324,10 @@ export default function ChordEditor() {
       >
         <h2 style={{ color:"#fff" }}>{title}</h2>
         {blocks.map((line,idx)=>(
-          <p
-            key={idx}
-            data-line={idx}
-            contentEditable={idx%2===1}
-            suppressContentEditableWarning
+          <p key={idx} data-line={idx} contentEditable={idx%2===1} suppressContentEditableWarning
             onBlur={e=>onEdit(idx,e)}
             style={{
-              margin:0,
-              padding:"4px 0",
-              minHeight:24,
+              margin:0, padding:"4px 0", minHeight:24,
               outline: idx%2===1 ? "1px dashed #777" : "none",
               color: idx%2===1 ? "#ddd" : "#bbb"
             }}
@@ -404,52 +335,34 @@ export default function ChordEditor() {
             {line}
           </p>
         ))}
-
-        {placed.map((c,i)=>((
+        {placed.map((c,i)=>(
           <div
             key={i}
             onClick={onChordClick(i)}
             onDoubleClick={onChordDoubleClick(i)}
             onContextMenu={handleChordContextMenu(c.chord)}
             style={{
-              position:"absolute",
-              left:c.x,
-              top:c.y,
-              background:"#555",
-              color:"#fff",
-              padding:"2px 6px",
-              border:"1px solid #777",
-              borderRadius:4,
-              cursor: movingIndex===i ? "move" : "pointer",
-              userSelect:"none"
+              position:"absolute", left:c.x, top:c.y,
+              background:"#555", color:"#fff", padding:"2px 6px",
+              border:"1px solid #777", borderRadius:4,
+              cursor: movingIndex===i ? "move" : "pointer", userSelect:"none"
             }}
           >
             {c.chord}
           </div>
-        )))}
-
+        ))}
         {menuType==="root" && (
           <div style={{
-            position:"absolute",
-            left:menuX,
-            top:menuY,
-            background:"#2b2b2b",
-            border:"1px solid #555",
-            borderRadius:4,
-            boxShadow:"2px 2px 8px rgba(0,0,0,0.5)",
-            zIndex:1000
+            position:"absolute", left:menuX, top:menuY,
+            background:"#2b2b2b", border:"1px solid #555", borderRadius:4,
+            boxShadow:"2px 2px 8px rgba(0,0,0,0.5)", zIndex:1000
           }}>
             {SCALE.map(r=>(
               <button key={r} onClick={e=>handleSelectRoot(r,e)}
                 style={{
-                  display:"block",
-                  width:"100%",
-                  padding:"6px 12px",
-                  textAlign:"left",
-                  background:"transparent",
-                  color:"#eee",
-                  border:"none",
-                  cursor:"pointer"
+                  display:"block", width:"100%", padding:"6px 12px",
+                  textAlign:"left", background:"transparent", color:"#eee",
+                  border:"none", cursor:"pointer"
                 }}
               >{r} ({chordMap[r]})</button>
             ))}
@@ -457,26 +370,16 @@ export default function ChordEditor() {
         )}
         {menuType==="suffix" && menuRoot && (
           <div style={{
-            position:"absolute",
-            left:menuX,
-            top:menuY,
-            background:"#2b2b2b",
-            border:"1px solid #555",
-            borderRadius:4,
-            boxShadow:"2px 2px 8px rgba(0,0,0,0.5)",
-            zIndex:1000
+            position:"absolute", left:menuX, top:menuY,
+            background:"#2b2b2b", border:"1px solid #555", borderRadius:4,
+            boxShadow:"2px 2px 8px rgba(0,0,0,0.5)", zIndex:1000
           }}>
             {SUFFIXES.map(s=>(
               <button key={s} onClick={e=>handleSelectSuffix(s,e)}
                 style={{
-                  display:"block",
-                  width:"100%",
-                  padding:"6px 12px",
-                  textAlign:"left",
-                  background:"transparent",
-                  color:"#eee",
-                  border:"none",
-                  cursor:"pointer"
+                  display:"block", width:"100%", padding:"6px 12px",
+                  textAlign:"left", background:"transparent", color:"#eee",
+                  border:"none", cursor:"pointer"
                 }}
               >{s===""?"M":s}</button>
             ))}
@@ -487,22 +390,13 @@ export default function ChordEditor() {
   );
 }
 
-// stili pulsanti
 const btnStyle: React.CSSProperties = {
-  display:"flex",
-  alignItems:"center",
-  gap:8,
-  width:"100%",
-  marginBottom:8,
-  background:"#444",
-  color:"#eee",
-  border:"none",
-  padding:"8px",
-  borderRadius:4,
-  cursor:"pointer"
+  display:"flex", alignItems:"center", gap:8,
+  width:"100%", marginBottom:8, background:"#444",
+  color:"#eee", border:"none", padding:"8px",
+  borderRadius:4, cursor:"pointer"
 };
+
 const btnStyleFlex: React.CSSProperties = {
-  ...btnStyle,
-  justifyContent:"center",
-  flex:1
+  ...btnStyle, justifyContent:"center", flex:1
 };
