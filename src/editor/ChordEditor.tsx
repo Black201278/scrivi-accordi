@@ -62,13 +62,6 @@ export default function ChordEditor() {
   const [redoStack,setRedoStack] = useState<Snapshot[]>([]);
   const [movingIndex,setMovingIndex] = useState<number|null>(null);
   const [selectedChord,setSelectedChord] = useState<string|null>(null);
-  const [showWelcome, setShowWelcome] = useState(true);
-
-  useEffect(() => {
-    if (blocks.length > 0 || placed.length > 0) {
-      setShowWelcome(false);
-    }
-  }, []);
 
   // context‐menu
   const [menuType,setMenuType] = useState<"root"|"suffix"|null>(null);
@@ -76,11 +69,40 @@ export default function ChordEditor() {
   const [menuY,setMenuY] = useState(0);
   const [menuRoot,setMenuRoot] = useState<string|null>(null);
   const clickRef = useRef<{localX:number,localY:number}|null>(null);
+  const [welcomeVisible, setWelcomeVisible] = useState(true);
+
 
   // mobile menu
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const containerRef = useRef<HTMLDivElement>(null);
+
+  // Auto‐save/Load
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      setWelcomeVisible(false);
+    }, 3000);
+    return () => clearTimeout(timeout);
+  }, []);
+  
+  useEffect(() => {
+    const saved = localStorage.getItem("chordEditorProject");
+    if (saved) {
+      try {
+        const d = JSON.parse(saved);
+        if (Array.isArray(d.blocks) && Array.isArray(d.placed)) {
+          setBlocks(d.blocks);
+          setPlaced(d.placed);
+        }
+      } catch {}
+    }
+  }, []);
+  useEffect(() => {
+    localStorage.setItem(
+      "chordEditorProject",
+      JSON.stringify({ blocks, placed })
+    );
+  }, [blocks, placed]);
 
   // Undo/Redo
   const makeSnapshot = (): Snapshot => ({
@@ -104,7 +126,6 @@ export default function ChordEditor() {
     setBlocks(next.blocks);
     setPlaced(next.placed);
   };
-  
 
   // Shortcut tastiera
   useEffect(() => {
@@ -120,7 +141,23 @@ export default function ChordEditor() {
     return () => document.removeEventListener("keydown", onKey);
   }, [undoStack, redoStack]);
 
+
   // File / Stampa / Salva / Carica
+  const handleTxtFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const text = reader.result as string;
+      const lines = text.split(/\r?\n/);
+      const formatted = lines.flatMap(line => ["", line.trim()]);
+      formatted.push("");
+      record();
+      setBlocks(formatted);
+      setPlaced([]);
+    };
+    reader.readAsText(file);
+  };
   const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0]; if (!f) return;
     record();
@@ -353,30 +390,19 @@ export default function ChordEditor() {
         </button>
         <div style={{ margin:"16px 0" }} />
         {/* Importa/Stampa/Salva/Carica */}
-        <label style={btnStyle as React.CSSProperties} className="force-button-label">
+        <button onClick={()=>document.getElementById("file-input")!.click()} style={btnStyle}>
           <FaFileWord /> Importa DOCX
-          <input
-            type="file"
-            accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-            onChange={handleFile}
-            style={{ display: "none" }}
-          />
-        </label>
-
-
-        <input id="file-input" type="file" onChange={handleFile} style={{ display:"none" }}/>
+        </button>
+        <button onClick={() => document.getElementById("txt-input")!.click()} style={btnStyle}>
+          <FaFileWord /> Importa TXT
+        </button>
+        <input id="txt-input" type="file" accept=".txt" onChange={handleTxtFile} style={{ display: "none" }} />
+        <input id="file-input" type="file" accept=".docx" onChange={handleFile} style={{ display:"none" }}/>
         <button onClick={exportPrint} style={btnStyle}><FaPrint /> Stampa</button>
         <button onClick={handleSave} style={btnStyle}><FaSave  /> Salva</button>
-        <label style={btnStyle as React.CSSProperties} className="force-button-label">
+        <button onClick={()=>document.getElementById("load-input")!.click()} style={btnStyle}>
           <FaFolderOpen /> Carica
-          <input
-            type="file"
-            accept=".json"
-            onChange={handleLoad}
-            style={{ display: "none" }}
-          />
-        </label>
-
+        </button>
         <input id="load-input" type="file" accept=".json" onChange={handleLoad} style={{ display:"none" }}/>
         {/* Converti / Transpose */}
         <button onClick={convertAllItalian} style={btnStyle}>
@@ -401,117 +427,114 @@ export default function ChordEditor() {
       </>
     );
   }
-
+  
+  
   return (
     <>
-    {showWelcome && (
-      <div className="welcome-overlay" onClick={() => setShowWelcome(false)}>
-        <div className="welcome-box">
-          <h2>Benvenuto!</h2>
-          <p>Inizia importando un file DOCX oppure scrivi direttamente il testo e inserisci gli accordi.</p>
-          <p>Tocca o clicca per iniziare.</p>
-        </div>
-      </div>
-    )}
-    <div className="chord-editor-container">
-      {/* Sidebar desktop */}
-      <aside className="desktop-sidebar">
-        <SidebarContent />
-      </aside>
-
-      {/* Bottone mobile */}
-      <button
-        className="mobile-menu-button"
-        onClick={() => setMobileMenuOpen(o => !o)}
-      >
-        <FaBars size={24} />
-      </button>
-
-      {/* Overlay mobile */}
-      {mobileMenuOpen && (
-        <div className="mobile-menu-overlay">
-          <SidebarContent />
+      {welcomeVisible && (
+        <div className="welcome-banner">
+          🎵 Benvenuto in Scrivi-Accordi! Clicca sulle righe vuote per inserire accordi.
         </div>
       )}
 
-      {/* Editor vero e proprio */}
-      <div
-        className="editor-content"
-        ref={containerRef}
-        onClick={onEditorClick}
-        onContextMenuCapture={handleContextMenu}
-      >
-        {blocks.map((line,idx) => (
-          <p
-            key={idx}
-            data-line={idx}
-            contentEditable={idx%2===1}
-            suppressContentEditableWarning
-            onBlur={e=>onEdit(idx,e)}
-            className={idx%2===1 ? "text-line" : "chord-line"}
-          >
-            {line}
-          </p>
-        ))}
+      <div className="chord-editor-container">
+        {/* Sidebar desktop */}
+        <aside className="desktop-sidebar">
+          <SidebarContent />
+        </aside>
 
-        {placed.map((c, i) => {
-          let lastTap = 0;
-          const isTouchDevice = typeof window !== "undefined" && "ontouchstart" in window;
+        {/* Bottone mobile */}
+        <button
+          className="mobile-menu-button"
+          onClick={() => setMobileMenuOpen(o => !o)}
+        >
+          <FaBars size={24} />
+        </button>
 
-          const handleTouchStart = (e: React.TouchEvent) => {
-            const now = Date.now();
-            if (now - lastTap < 300) {
-              // Doppio tap
-              e.stopPropagation();
-              record();
-              setPlaced(ps => ps.filter((_, j) => j !== i));
-            }
-            lastTap = now;
-          };
+        {/* Overlay mobile */}
+        {mobileMenuOpen && (
+          <div className="mobile-menu-overlay">
+            <SidebarContent />
+          </div>
+        )}
 
-          return (
-            <div
-              key={i}
-              className="placed-chord"
-              style={{ left: c.x, top: c.y }}
-              onClick={e => {
+        {/* Editor vero e proprio */}
+        <div
+          className="editor-content"
+          ref={containerRef}
+          onClick={onEditorClick}
+          onContextMenuCapture={handleContextMenu}
+        >
+          {blocks.map((line,idx) => (
+            <p
+              key={idx}
+              data-line={idx}
+              contentEditable={idx%2===1}
+              suppressContentEditableWarning
+              onBlur={e=>onEdit(idx,e)}
+              className={idx%2===1 ? "text-line" : "chord-line"}
+            >
+              {line}
+            </p>
+          ))}
+
+          {placed.map((c, i) => {
+            let lastTap = 0;
+            const isTouchDevice = typeof window !== "undefined" && "ontouchstart" in window;
+
+            const handleTouchStart = (e: React.TouchEvent) => {
+              const now = Date.now();
+              if (now - lastTap < 300) {
                 e.stopPropagation();
                 record();
-                setMovingIndex(i);
-              }}
-              onDoubleClick={onChordDoubleClick(i)}
-              onTouchStart={isTouchDevice ? handleTouchStart : undefined}
-              onContextMenu={handleChordContextMenu(c.chord)}
-            >
-              {c.chord}
+                setPlaced(ps => ps.filter((_, j) => j !== i));
+              }
+              lastTap = now;
+            };
+
+            return (
+              <div
+                key={i}
+                className="placed-chord"
+                style={{ left: c.x, top: c.y }}
+                onClick={e => {
+                  e.stopPropagation();
+                  record();
+                  setMovingIndex(i);
+                }}
+                onDoubleClick={onChordDoubleClick(i)}
+                onTouchStart={isTouchDevice ? handleTouchStart : undefined}
+                onContextMenu={handleChordContextMenu(c.chord)}
+              >
+                {c.chord}
+              </div>
+            );
+          })}
+
+          {menuType==="root" && (
+            <div className="context-menu" style={{ left:menuX, top:menuY }}>
+              {SCALE.map(r => (
+                <button key={r} onClick={e=>handleSelectRoot(r,e)}>
+                  {r} ({chordMap[r]})
+                </button>
+              ))}
             </div>
-          );
-        })}
-
-
-        {menuType==="root" && (
-          <div className="context-menu" style={{ left:menuX, top:menuY }}>
-            {SCALE.map(r => (
-              <button key={r} onClick={e=>handleSelectRoot(r,e)}>
-                {r} ({chordMap[r]})
-              </button>
-            ))}
-          </div>
-        )}
-        {menuType==="suffix" && menuRoot && (
-          <div className="context-menu" style={{ left:menuX, top:menuY }}>
-            {SUFFIXES.map(s => (
-              <button key={s} onClick={e=>handleSelectSuffix(s,e)}>
-                {s||"M"}
-              </button>
-            ))}
-          </div>
-        )}
+          )}
+          {menuType==="suffix" && menuRoot && (
+            <div className="context-menu" style={{ left:menuX, top:menuY }}>
+              {SUFFIXES.map(s => (
+                <button key={s} onClick={e=>handleSelectSuffix(s,e)}>
+                  {s||"M"}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
-    </div>
     </>
   );
 }
+
 
 // stili pulsanti
 const btnStyle: React.CSSProperties = {
