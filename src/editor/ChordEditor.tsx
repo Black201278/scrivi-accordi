@@ -28,7 +28,6 @@ interface Snapshot {
 }
 
 // —– Mappe e utilità —–
-const [showWelcome, setShowWelcome] = useState(true);
 const SCALE = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"];
 const FLAT_TO_SHARP: Record<string,string> = { Db:"C#", Eb:"D#", Gb:"F#", Ab:"G#", Bb:"A#" };
 const chordMap: Record<string,string> = {
@@ -63,6 +62,7 @@ export default function ChordEditor() {
   const [redoStack,setRedoStack] = useState<Snapshot[]>([]);
   const [movingIndex,setMovingIndex] = useState<number|null>(null);
   const [selectedChord,setSelectedChord] = useState<string|null>(null);
+  const [showWelcome, setShowWelcome] = useState(true);
 
   // context‐menu
   const [menuType,setMenuType] = useState<"root"|"suffix"|null>(null);
