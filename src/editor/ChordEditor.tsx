@@ -75,26 +75,6 @@ export default function ChordEditor() {
 
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // Auto‐save/Load
-  useEffect(() => {
-    const saved = localStorage.getItem("chordEditorProject");
-    if (saved) {
-      try {
-        const d = JSON.parse(saved);
-        if (Array.isArray(d.blocks) && Array.isArray(d.placed)) {
-          setBlocks(d.blocks);
-          setPlaced(d.placed);
-        }
-      } catch {}
-    }
-  }, []);
-  useEffect(() => {
-    localStorage.setItem(
-      "chordEditorProject",
-      JSON.stringify({ blocks, placed })
-    );
-  }, [blocks, placed]);
-
   // Undo/Redo
   const makeSnapshot = (): Snapshot => ({
     blocks: [...blocks],
