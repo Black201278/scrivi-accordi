@@ -1,25 +1,19 @@
-import mammoth from "mammoth";
-
 export async function loadDocx(file: File): Promise<string[]> {
-  try {
-    const arrayBuffer = await new Promise<ArrayBuffer>((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result as ArrayBuffer);
-      reader.onerror = () => reject(reader.error);
-      reader.readAsArrayBuffer(file);
-    });
+  const formData = new FormData();
+  formData.append("file", file);
 
-    const result = await mammoth.extractRawText({ arrayBuffer });
-    const text = result.value || "";
-    const lines = text
-      .split(/\r?\n/)
-      .map(line => line.trim())
-      .filter(line => line.length > 0);
+  const res = await fetch("/api/parse-docx", {
+    method: "POST",
+    body: await file.arrayBuffer(), // manda binario direttamente
+    headers: {
+      "Content-Type": "application/octet-stream",
+    }
+  });
 
-    return lines;
-  } catch (err) {
-    console.error("Errore durante il parsing DOCX con Mammoth:", err);
-    alert("Errore durante il caricamento del file DOCX.\nProva con un altro file o browser.");
-    return [];
+  if (!res.ok) {
+    throw new Error("Errore lato server durante il parsing DOCX");
   }
+
+  const data = await res.json();
+  return data.lines || [];
 }
