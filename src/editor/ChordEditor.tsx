@@ -1,6 +1,6 @@
-// src/editor/ChordEditor.tsx
 import React, { useState, useRef, useEffect } from "react";
 import { loadDocx } from "../utils/loadDocx";
+import html2canvas from "html2canvas";
 import {
   FaUndo,
   FaRedo,
@@ -11,7 +11,9 @@ import {
   FaMinus,
   FaPlus,
   FaFileWord,
+  FaBars,
 } from "react-icons/fa";
+import "./ChordEditor.css";
 
 interface PlacedChord {
   chord: string;
@@ -20,14 +22,12 @@ interface PlacedChord {
   line: number;
   pos: number;
 }
-
 interface Snapshot {
-  title: string;
   blocks: string[];
   placed: PlacedChord[];
 }
 
-// Mappe
+// —– Mappe e utilità —–
 const SCALE = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"];
 const FLAT_TO_SHARP: Record<string,string> = { Db:"C#", Eb:"D#", Gb:"F#", Ab:"G#", Bb:"A#" };
 const chordMap: Record<string,string> = {
@@ -38,14 +38,12 @@ const chordMap: Record<string,string> = {
 const invChordMap = Object.entries(chordMap)
   .reduce((o,[i,ita]) => ((o[ita]=i), o), {} as Record<string,string>);
 const SUFFIXES = ["","m","7","M7","m7","sus4","dim"];
-
-function splitChord(ch:string):[string,string] {
+function splitChord(ch: string): [string,string] {
   for (let suf of SUFFIXES) if (suf && ch.endsWith(suf))
     return [ch.slice(0,-suf.length), suf];
   return [ch, ""];
 }
-
-function transposeChord(ch:string, st:number):string {
+function transposeChord(ch: string, st: number): string {
   const [r,s] = splitChord(ch);
   const intl = invChordMap[r]||r;
   const norm = FLAT_TO_SHARP[intl]||intl;
@@ -53,11 +51,11 @@ function transposeChord(ch:string, st:number):string {
   if (idx<0) return ch;
   const ni = (idx+st+12)%12;
   const nr = SCALE[ni], isIt = Object.values(chordMap).includes(r);
-  return (isIt ? chordMap[nr]:nr)+s;
+  return (isIt ? chordMap[nr] : nr) + s;
 }
 
 export default function ChordEditor() {
-  const [title,setTitle] = useState("Titolo canzone");
+  // Stati
   const [blocks,setBlocks] = useState<string[]>([]);
   const [placed,setPlaced] = useState<PlacedChord[]>([]);
   const [undoStack,setUndoStack] = useState<Snapshot[]>([]);
@@ -65,33 +63,49 @@ export default function ChordEditor() {
   const [movingIndex,setMovingIndex] = useState<number|null>(null);
   const [selectedChord,setSelectedChord] = useState<string|null>(null);
 
+  // context‐menu
   const [menuType,setMenuType] = useState<"root"|"suffix"|null>(null);
   const [menuX,setMenuX] = useState(0);
   const [menuY,setMenuY] = useState(0);
   const [menuRoot,setMenuRoot] = useState<string|null>(null);
   const clickRef = useRef<{localX:number,localY:number}|null>(null);
+
+  // mobile menu
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
   const containerRef = useRef<HTMLDivElement>(null);
 
+  // Auto‐save/Load
+  useEffect(() => {
+    const saved = localStorage.getItem("chordEditorProject");
+    if (saved) {
+      try {
+        const d = JSON.parse(saved);
+        if (Array.isArray(d.blocks) && Array.isArray(d.placed)) {
+          setBlocks(d.blocks);
+          setPlaced(d.placed);
+        }
+      } catch {}
+    }
+  }, []);
   useEffect(() => {
     localStorage.setItem(
       "chordEditorProject",
-      JSON.stringify({ title, blocks, placed })
+      JSON.stringify({ blocks, placed })
     );
-  }, [title, blocks, placed]);
+  }, [blocks, placed]);
 
-  const makeSnapshot = ():Snapshot => ({
-    title, blocks:[...blocks], placed:placed.map(c=>({ ...c }))
+  // Undo/Redo
+  const makeSnapshot = (): Snapshot => ({
+    blocks: [...blocks],
+    placed: placed.map(c => ({ ...c })),
   });
-  const record = () => {
-    setUndoStack(u=>[...u,makeSnapshot()]);
-    setRedoStack([]);
-  };
+  const record = () => { setUndoStack(u=>[...u,makeSnapshot()]); setRedoStack([]); };
   const handleUndo = () => {
     if (!undoStack.length) return;
     const prev = undoStack[undoStack.length-1];
     setUndoStack(u=>u.slice(0,-1));
     setRedoStack(r=>[...r, makeSnapshot()]);
-    setTitle(prev.title);
     setBlocks(prev.blocks);
     setPlaced(prev.placed);
   };
@@ -100,13 +114,13 @@ export default function ChordEditor() {
     const next = redoStack[redoStack.length-1];
     setRedoStack(r=>r.slice(0,-1));
     setUndoStack(u=>[...u, makeSnapshot()]);
-    setTitle(next.title);
     setBlocks(next.blocks);
     setPlaced(next.placed);
   };
 
+  // Shortcut tastiera
   useEffect(() => {
-    const onKey = (e:KeyboardEvent) => {
+    const onKey = (e: KeyboardEvent) => {
       if (e.ctrlKey && !e.shiftKey && e.key.toLowerCase()==="z") {
         e.preventDefault(); handleUndo();
       }
@@ -116,272 +130,367 @@ export default function ChordEditor() {
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [undoStack,redoStack]);
+  }, [undoStack, redoStack]);
 
-  const handleFile = async (e:React.ChangeEvent<HTMLInputElement>) => {
+  // File / Stampa / Salva / Carica
+  const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0]; if (!f) return;
     record();
     const paras = await loadDocx(f);
-    const d = paras.flatMap(p=>["",p]);
+    const d = paras.flatMap(p => ["", p]);
     d.push("");
     setBlocks(d);
     setPlaced([]);
   };
-  const exportPrint = () => {
-    if (!containerRef.current) return;
-    const w = window.open("","_blank")!;
+  const exportPrint = async () => {
+    const ctr = containerRef.current;
+    if (!ctr) return;
+  
+    // Clona l'intero contenuto
+    const clone = ctr.cloneNode(true) as HTMLElement;
+  
+    // Applica stile temporaneo nero su bianco
+    clone.style.position = "absolute";
+    clone.style.left = "-9999px";
+    clone.style.top = "0";
+    clone.style.backgroundColor = "#ffffff";
+    clone.style.color = "#000000";
+    clone.style.height = "auto";
+    clone.style.overflow = "visible";
+  
+    // Forza ogni elemento interno a colore nero
+    clone.querySelectorAll("*").forEach(el => {
+      (el as HTMLElement).style.color = "#000000";
+      (el as HTMLElement).style.backgroundColor = "#ffffff";
+    });
+  
+    document.body.appendChild(clone);
+  
+    // Aspetta che venga aggiunto al DOM
+    await new Promise(requestAnimationFrame);
+  
+    // Cattura l’immagine del clone
+    const canvas = await html2canvas(clone, {
+      backgroundColor: "#ffffff",
+      scale: 2,
+      useCORS: true,
+      width: clone.scrollWidth,
+      height: clone.scrollHeight,
+    });
+  
+    // Rimuovi il clone invisibile
+    document.body.removeChild(clone);
+  
+    const imgData = canvas.toDataURL("image/png");
+  
+    // Apri e stampa immagine
+    const w = window.open("", "_blank");
+    if (!w) return;
     w.document.write(`
-      <!DOCTYPE html><html><head><meta charset=utf-8>
-      <title>${title}</title><link rel="stylesheet" href="/index.css">
-      </head><body style="margin:0">${containerRef.current.outerHTML}</body></html>
+      <!DOCTYPE html>
+      <html>
+        <head><title>Stampa</title></head>
+        <body style="margin:0; text-align:center; background:#fff;">
+          <img src="${imgData}" style="max-width:100%;"/>
+          <script>
+            window.onload = function() {
+              window.print();
+              window.onafterprint = function() { window.close(); };
+            };
+          </script>
+        </body>
+      </html>
     `);
-    w.document.close(); w.focus(); w.print(); w.close();
+    w.document.close();
   };
+  
+  
   const handleSave = () => {
-    const blob = new Blob([JSON.stringify({ title, blocks, placed })],{type:"application/json"});
+    const blob = new Blob([JSON.stringify({ blocks, placed })],{type:"application/json"});
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
-    a.href = url; a.download = `${title||"progetto"}.json`; a.click();
+    a.href = url; a.download = `progetto".json`; a.click();
     URL.revokeObjectURL(url);
   };
-  const handleLoad = (e:React.ChangeEvent<HTMLInputElement>) => {
+  const handleLoad = (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0]; if (!f) return;
     const rd = new FileReader();
     rd.onload = () => {
       try {
         const d = JSON.parse(rd.result as string);
         record();
-        setTitle(d.title||"");
         setBlocks(d.blocks||[]);
         setPlaced(d.placed||[]);
-      } catch { alert("Progetto non valido"); }
+      } catch {
+        alert("Progetto non valido");
+      }
     };
     rd.readAsText(f);
   };
 
+  // Converti / Transpose
   const convertAllItalian = () => {
     record();
     setPlaced(ps => ps.map(pc => {
       const [r,s] = splitChord(pc.chord);
-      return { ...pc, chord:(chordMap[r]||r)+s };
+      return { ...pc, chord: (chordMap[r]||r) + s };
     }));
   };
   const convertAllInternational = () => {
     record();
     setPlaced(ps => ps.map(pc => {
       const [r,s] = splitChord(pc.chord);
-      return { ...pc, chord:(invChordMap[r]||r)+s };
+      return { ...pc, chord: (invChordMap[r]||r) + s };
     }));
   };
-  const transposeAll = (st:number) => {
+  const transposeAll = (st: number) => {
     record();
     setPlaced(ps => ps.map(pc => ({
       ...pc, chord: transposeChord(pc.chord, st)
     })));
   };
 
-  const handleContextMenu = (e:React.MouseEvent) => {
+  // Context‐menu inserimento
+  const handleContextMenu = (e: React.MouseEvent) => {
     e.preventDefault();
     const ctr = containerRef.current; if (!ctr) return;
-    const el = (e.target as HTMLElement).closest("p[data-line]") as HTMLElement|null;
+    const el = (e.target as HTMLElement).closest("p[data-line]") as HTMLElement| null;
     if (!el) return;
-    const idx = parseInt(el.dataset.line!,10);
-    if (idx%2===1) return;
+    const idx = parseInt(el.dataset.line!, 10);
+    if (idx % 2 === 1) return; // solo righe vuote
     const rect = ctr.getBoundingClientRect();
-    const localX = e.clientX - rect.left + ctr.scrollLeft;
-    const localY = e.clientY - rect.top + ctr.scrollTop;
-    clickRef.current = { localX, localY };
-    setMenuType("root"); setMenuRoot(null);
-    setMenuX(localX); setMenuY(localY);
+    clickRef.current = {
+      localX: e.clientX - rect.left + ctr.scrollLeft,
+      localY: e.clientY - rect.top  + ctr.scrollTop
+    };
+    setMenuType("root");
+    setMenuRoot(null);
+    setMenuX(clickRef.current.localX);
+    setMenuY(clickRef.current.localY);
   };
-
-  const handleSelectRoot = (r:string,e:React.MouseEvent) => {
-    e.stopPropagation(); setMenuRoot(r); setMenuType("suffix");
-  };
-
-  const handleSelectSuffix = (s:string,e:React.MouseEvent) => {
+  const handleSelectRoot = (r: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!menuRoot) { setMenuType(null); return; }
+    setMenuRoot(r);
+    setMenuType("suffix");
+  };
+  const handleSelectSuffix = (s: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!menuRoot) {
+      setMenuType(null);
+      return;
+    }
     setSelectedChord(menuRoot + s);
     setMenuType(null);
     document.body.style.cursor = "crosshair";
   };
 
-  const onEditorClick = (e:React.MouseEvent) => {
+  // Click editor: piazza / sposta
+  const onEditorClick = (e: React.MouseEvent) => {
     const ctr = containerRef.current; if (!ctr) return;
     const rect = ctr.getBoundingClientRect();
     const lx = e.clientX - rect.left + ctr.scrollLeft;
 
+    // sposta
     if (movingIndex !== null) {
       record();
       setPlaced(ps => ps.map((c,i) => {
-        if (i===movingIndex) {
-          const p = ctr.querySelector(`p[data-line="${c.line}"]`) as HTMLElement|null;
-          const lockedY = p ? (p.getBoundingClientRect().top - rect.top + ctr.scrollTop) : c.y;
+        if (i === movingIndex) {
+          const p = ctr.querySelector(`p[data-line="${c.line}"]`) as HTMLElement| null;
+          const lockedY = p
+            ? (p.getBoundingClientRect().top - rect.top + ctr.scrollTop)
+            : c.y;
           return { ...c, x: lx, y: lockedY };
         }
         return c;
       }));
       setMovingIndex(null);
-      document.body.style.cursor="text";
+      document.body.style.cursor = "text";
       return;
     }
 
+    // piazza nuovo
     if (selectedChord) {
-      const el = (e.target as HTMLElement).closest("p[data-line]") as HTMLElement|null;
+      const el = (e.target as HTMLElement).closest("p[data-line]") as HTMLElement| null;
       if (!el) return;
-      const idx = parseInt(el.dataset.line!,10);
-      if (idx%2===0) {
+      const idx = parseInt(el.dataset.line!, 10);
+      if (idx % 2 === 0) {
         record();
-        setPlaced(ps=>[
+        setPlaced(ps => [
           ...ps,
-          { chord:selectedChord, x:lx, y:el.offsetTop, line:idx, pos:0 }
+          { chord: selectedChord, x: lx, y: el.offsetTop, line: idx, pos: 0 }
         ]);
         setSelectedChord(null);
-        document.body.style.cursor="text";
+        document.body.style.cursor = "text";
       }
       return;
     }
 
+    // chiudi menu
     if (menuType) setMenuType(null);
   };
 
-  const handleChordContextMenu = (ch:string)=>(e:React.MouseEvent)=>{
-    e.preventDefault(); e.stopPropagation();
-    setSelectedChord(ch);
-    document.body.style.cursor="crosshair";
-  };
-  const onChordClick = (i:number)=>(e:React.MouseEvent)=>{
-    e.stopPropagation();
-    setMovingIndex(i);
-    setSelectedChord(null);
-    document.body.style.cursor="move";
-  };
-  const onChordDoubleClick = (i:number)=>(e:React.MouseEvent)=>{
-    e.stopPropagation();
-    record();
-    setPlaced(ps=>ps.filter((_,j)=>j!==i));
-  };
-
-  const onEdit = (i:number,e:React.FormEvent<HTMLParagraphElement>)=>{
-    record();
-    const txt = e.currentTarget.textContent||"";
-    setBlocks(bs=>bs.map((b,j)=>j===i?txt:b));
+  // Copy / delete
+  const handleChordContextMenu =
+    (ch: string) =>
+    (e: React.MouseEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setSelectedChord(ch);
+      document.body.style.cursor = "crosshair";
+    };
+  const onChordDoubleClick = (i: number) =>
+    (e: React.MouseEvent) => {
+      e.stopPropagation();
+      record();
+      setPlaced(ps => ps.filter((_,j) => j !== i));
   };
 
-  return (
-    <div style={{ display:"flex", height:"100vh", background:"#1e1e1e", color:"#ddd" }}>
-      <aside style={{ width:240, padding:16, background:"#2b2b2b" }}>
-        <div style={{ marginBottom:16 }}>
-          <label style={{ color:"#ccc", display:"block", marginBottom:4 }}>Titolo:</label>
-          <input
-            type="text"
-            value={title}
-            onChange={e => setTitle(e.target.value)}
-            placeholder="Titolo canzone"
-            style={{
-              width:"100%", padding:"6px", borderRadius:4,
-              border:"1px solid #555", background:"#333", color:"#eee"
-            }}
-          />
-        </div>
-        <button onClick={handleUndo} disabled={!undoStack.length} style={btnStyle}><FaUndo /> Undo</button>
-        <button onClick={handleRedo} disabled={!redoStack.length} style={btnStyle}><FaRedo /> Redo</button>
+  // Edit inline testo
+  const onEdit = (i: number, e: React.FormEvent<HTMLParagraphElement>) => {
+    record();
+    const txt = e.currentTarget.textContent || "";
+    setBlocks(bs => bs.map((b,j) => j===i ? txt : b));
+  };
+
+  // Sidebar come componente
+  function SidebarContent() {
+    return (
+      <>
+        {/* Undo/Redo */}
+        <button onClick={handleUndo} disabled={!undoStack.length} style={btnStyle}>
+          <FaUndo /> Undo
+        </button>
+        <button onClick={handleRedo} disabled={!redoStack.length} style={btnStyle}>
+          <FaRedo /> Redo
+        </button>
         <div style={{ margin:"16px 0" }} />
+        {/* Importa/Stampa/Salva/Carica */}
         <button onClick={()=>document.getElementById("file-input")!.click()} style={btnStyle}>
           <FaFileWord /> Importa DOCX
         </button>
-        <input id="file-input" type="file" accept=".docx" onChange={handleFile} style={{ display:"none" }} />
+        <input id="file-input" type="file" accept=".docx" onChange={handleFile} style={{ display:"none" }}/>
         <button onClick={exportPrint} style={btnStyle}><FaPrint /> Stampa</button>
-        <button onClick={handleSave} style={btnStyle}><FaSave /> Salva</button>
+        <button onClick={handleSave} style={btnStyle}><FaSave  /> Salva</button>
         <button onClick={()=>document.getElementById("load-input")!.click()} style={btnStyle}>
           <FaFolderOpen /> Carica
         </button>
-        <input id="load-input" type="file" accept=".json" onChange={handleLoad} style={{ display:"none" }} />
-        <button onClick={convertAllItalian} style={btnStyle}><FaLanguage /> → IT</button>
-        <button onClick={convertAllInternational} style={btnStyle}><FaLanguage /> → INT</button>
+        <input id="load-input" type="file" accept=".json" onChange={handleLoad} style={{ display:"none" }}/>
+        {/* Converti / Transpose */}
+        <button onClick={convertAllItalian} style={btnStyle}>
+          <FaLanguage /> → IT
+        </button>
+        <button onClick={convertAllInternational} style={btnStyle}>
+          <FaLanguage /> → INT
+        </button>
         <div style={{ display:"flex", gap:8, marginTop:8 }}>
-          <button onClick={()=>transposeAll(-1)} style={btnStyleFlex}><FaMinus /> -1</button>
-          <button onClick={()=>transposeAll(1)} style={btnStyleFlex}><FaPlus /> +1</button>
+          <button onClick={()=>transposeAll(-1)} style={btnStyleFlex}>
+            <FaMinus /> -1
+          </button>
+          <button onClick={()=>transposeAll(1)} style={btnStyleFlex}>
+            <FaPlus  /> +1
+          </button>
         </div>
-        <div style={{ marginTop: 32, fontSize: "0.8em", color: "#888", textAlign: "center" }}>
-          <p style={{ marginBottom: 4 }}>WebApp creata da un Cantore per i Cantori</p>
+        {/* Crediti */}
+        <div style={{ marginTop:32, fontSize:"0.8em", color:"#888", textAlign:"center" }}>
+          <p style={{ marginBottom:4 }}>WebApp creata da un Cantore per i Cantori</p>
           <p>© 2025 Fabio Bova</p>
         </div>
+      </>
+    );
+  }
+
+  return (
+    <div className="chord-editor-container">
+      {/* Sidebar desktop */}
+      <aside className="desktop-sidebar">
+        <SidebarContent />
       </aside>
 
+      {/* Bottone mobile */}
+      <button
+        className="mobile-menu-button"
+        onClick={() => setMobileMenuOpen(o => !o)}
+      >
+        <FaBars size={24} />
+      </button>
+
+      {/* Overlay mobile */}
+      {mobileMenuOpen && (
+        <div className="mobile-menu-overlay">
+          <SidebarContent />
+        </div>
+      )}
+
+      {/* Editor vero e proprio */}
       <div
+        className="editor-content"
         ref={containerRef}
         onClick={onEditorClick}
         onContextMenuCapture={handleContextMenu}
-        style={{
-          position:"relative", flex:1, padding:16,
-          overflow:"auto", background:"#1e1e1e",
-          backgroundImage:"linear-gradient(rgba(255,255,255,0.05) 1px, transparent 1px)",
-          backgroundSize:"100% 30px",
-          cursor: movingIndex!==null ? "move" : "text"
-        }}
       >
-        <h2 style={{ color:"#fff" }}>{title}</h2>
-        {blocks.map((line,idx)=>(
-          <p key={idx} data-line={idx} contentEditable={idx%2===1} suppressContentEditableWarning
+        {blocks.map((line,idx) => (
+          <p
+            key={idx}
+            data-line={idx}
+            contentEditable={idx%2===1}
+            suppressContentEditableWarning
             onBlur={e=>onEdit(idx,e)}
-            style={{
-              margin:0, padding:"4px 0", minHeight:24,
-              outline: idx%2===1 ? "1px dashed #777" : "none",
-              color: idx%2===1 ? "#ddd" : "#bbb"
-            }}
+            className={idx%2===1 ? "text-line" : "chord-line"}
           >
             {line}
           </p>
         ))}
-        {placed.map((c,i)=>(
-          <div
-            key={i}
-            onClick={onChordClick(i)}
-            onDoubleClick={onChordDoubleClick(i)}
-            onContextMenu={handleChordContextMenu(c.chord)}
-            style={{
-              position:"absolute", left:c.x, top:c.y,
-              background:"#555", color:"#fff", padding:"2px 6px",
-              border:"1px solid #777", borderRadius:4,
-              cursor: movingIndex===i ? "move" : "pointer", userSelect:"none"
-            }}
-          >
-            {c.chord}
-          </div>
-        ))}
+
+        {placed.map((c, i) => {
+          let lastTap = 0;
+          const isTouchDevice = typeof window !== "undefined" && "ontouchstart" in window;
+
+          const handleTouchStart = (e: React.TouchEvent) => {
+            const now = Date.now();
+            if (now - lastTap < 300) {
+              // Doppio tap
+              e.stopPropagation();
+              record();
+              setPlaced(ps => ps.filter((_, j) => j !== i));
+            }
+            lastTap = now;
+          };
+
+          return (
+            <div
+              key={i}
+              className="placed-chord"
+              style={{ left: c.x, top: c.y }}
+              onClick={e => {
+                e.stopPropagation();
+                record();
+                setMovingIndex(i);
+              }}
+              onDoubleClick={onChordDoubleClick(i)}
+              onTouchStart={isTouchDevice ? handleTouchStart : undefined}
+              onContextMenu={handleChordContextMenu(c.chord)}
+            >
+              {c.chord}
+            </div>
+          );
+        })}
+
+
         {menuType==="root" && (
-          <div style={{
-            position:"absolute", left:menuX, top:menuY,
-            background:"#2b2b2b", border:"1px solid #555", borderRadius:4,
-            boxShadow:"2px 2px 8px rgba(0,0,0,0.5)", zIndex:1000
-          }}>
-            {SCALE.map(r=>(
-              <button key={r} onClick={e=>handleSelectRoot(r,e)}
-                style={{
-                  display:"block", width:"100%", padding:"6px 12px",
-                  textAlign:"left", background:"transparent", color:"#eee",
-                  border:"none", cursor:"pointer"
-                }}
-              >{r} ({chordMap[r]})</button>
+          <div className="context-menu" style={{ left:menuX, top:menuY }}>
+            {SCALE.map(r => (
+              <button key={r} onClick={e=>handleSelectRoot(r,e)}>
+                {r} ({chordMap[r]})
+              </button>
             ))}
           </div>
         )}
         {menuType==="suffix" && menuRoot && (
-          <div style={{
-            position:"absolute", left:menuX, top:menuY,
-            background:"#2b2b2b", border:"1px solid #555", borderRadius:4,
-            boxShadow:"2px 2px 8px rgba(0,0,0,0.5)", zIndex:1000
-          }}>
-            {SUFFIXES.map(s=>(
-              <button key={s} onClick={e=>handleSelectSuffix(s,e)}
-                style={{
-                  display:"block", width:"100%", padding:"6px 12px",
-                  textAlign:"left", background:"transparent", color:"#eee",
-                  border:"none", cursor:"pointer"
-                }}
-              >{s===""?"M":s}</button>
+          <div className="context-menu" style={{ left:menuX, top:menuY }}>
+            {SUFFIXES.map(s => (
+              <button key={s} onClick={e=>handleSelectSuffix(s,e)}>
+                {s||"M"}
+              </button>
             ))}
           </div>
         )}
@@ -390,13 +499,13 @@ export default function ChordEditor() {
   );
 }
 
+// stili pulsanti
 const btnStyle: React.CSSProperties = {
   display:"flex", alignItems:"center", gap:8,
   width:"100%", marginBottom:8, background:"#444",
   color:"#eee", border:"none", padding:"8px",
   borderRadius:4, cursor:"pointer"
 };
-
 const btnStyleFlex: React.CSSProperties = {
   ...btnStyle, justifyContent:"center", flex:1
 };

@@ -1,6 +1,9 @@
 import React from "react";
-import ChordEditor from "./editor/ChordEditor";  // <-- qui
+import ChordEditor from "./editor/ChordEditor";
+import "./index.css";
 
-export default function App() {
+function App() {
   return <ChordEditor />;
 }
+
+export default App;
