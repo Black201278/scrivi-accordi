@@ -365,14 +365,26 @@ export default function ChordEditor() {
         </button>
         <div style={{ margin:"16px 0" }} />
         {/* Importa/Stampa/Salva/Carica */}
-        <label style={btnStyle as React.CSSProperties} className="force-button-label">
+        <div style={{ position: "relative", marginBottom: 8 }}>
+        <input
+          type="file"
+          accept=".docx"
+          onChange={handleFile}
+          style={{
+            opacity: 0,
+            position: "absolute",
+            left: 0,
+            top: 0,
+            width: "100%",
+            height: "100%",
+            zIndex: 2,
+            cursor: "pointer"
+          }}
+        />
+        <div style={btnStyle}>
           <FaFileWord /> Importa DOCX
-          <input
-            type="file"
-            onChange={handleFile}
-            style={{ display: "none" }}
-          />
-        </label>
+        </div>
+      </div>
 
 
         <input id="file-input" type="file" onChange={handleFile} style={{ display:"none" }}/>
