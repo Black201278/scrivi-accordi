@@ -120,3 +120,22 @@
   text-align: center;
   box-sizing: border-box;
 }
+.welcome-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  z-index: 1000;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.welcome-box {
+  background: white;
+  color: black;
+  padding: 24px;
+  border-radius: 8px;
+  max-width: 90%;
+  text-align: center;
+  box-shadow: 0 0 12px rgba(0,0,0,0.5);
+}
