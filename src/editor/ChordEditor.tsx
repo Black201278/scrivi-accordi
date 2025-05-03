@@ -501,6 +501,7 @@ export default function ChordEditor() {
         )}
       </div>
     </div>
+    </>
   );
 }
 
