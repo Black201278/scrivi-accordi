@@ -62,6 +62,12 @@ export default function ChordEditor() {
   const [redoStack,setRedoStack] = useState<Snapshot[]>([]);
   const [movingIndex,setMovingIndex] = useState<number|null>(null);
   const [selectedChord,setSelectedChord] = useState<string|null>(null);
+  useEffect(() => {
+    if (blocks.length > 0 || placed.length > 0) {
+      setShowWelcome(false);
+    }
+  }, []);
+  
   const [showWelcome, setShowWelcome] = useState(true);
 
   // context‐menu
