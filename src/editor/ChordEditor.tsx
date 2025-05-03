@@ -103,16 +103,8 @@ export default function ChordEditor() {
     setUndoStack(u=>[...u, makeSnapshot()]);
     setBlocks(next.blocks);
     setPlaced(next.placed);
-    const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
-      const f = e.target.files?.[0]; if (!f) return;
-      record();
-      const paras = await loadDocx(f);
-      const d = paras.flatMap(p => ["", p]);
-      d.push("");
-      setBlocks(d);
-      setPlaced([]);
-      setShowWelcome(false);
   };
+  
 
   // Shortcut tastiera
   useEffect(() => {
@@ -365,6 +357,7 @@ export default function ChordEditor() {
           <FaFileWord /> Importa DOCX
           <input
             type="file"
+            accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
             onChange={handleFile}
             style={{ display: "none" }}
           />
