@@ -375,7 +375,7 @@ export default function ChordEditor() {
         </label>
 
 
-        <input id="file-input" type="file" accept=".docx" onChange={handleFile} style={{ display:"none" }}/>
+        <input id="file-input" type="file" onChange={handleFile} style={{ display:"none" }}/>
         <button onClick={exportPrint} style={btnStyle}><FaPrint /> Stampa</button>
         <button onClick={handleSave} style={btnStyle}><FaSave  /> Salva</button>
         <label style={btnStyle as React.CSSProperties} className="force-button-label">
