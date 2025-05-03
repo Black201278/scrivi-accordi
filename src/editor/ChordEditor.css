@@ -113,3 +113,10 @@
     display: none;
   }
 }
+.force-button-label {
+  appearance: button;
+  -webkit-appearance: button;
+  line-height: normal;
+  text-align: center;
+  box-sizing: border-box;
+}

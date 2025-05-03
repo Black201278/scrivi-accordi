@@ -365,15 +365,30 @@ export default function ChordEditor() {
         </button>
         <div style={{ margin:"16px 0" }} />
         {/* Importa/Stampa/Salva/Carica */}
-        <button onClick={()=>document.getElementById("file-input")!.click()} style={btnStyle}>
+        <label style={btnStyle as React.CSSProperties} className="force-button-label">
           <FaFileWord /> Importa DOCX
-        </button>
+          <input
+            type="file"
+            accept=".docx"
+            onChange={handleFile}
+            style={{ display: "none" }}
+          />
+        </label>
+
+
         <input id="file-input" type="file" accept=".docx" onChange={handleFile} style={{ display:"none" }}/>
         <button onClick={exportPrint} style={btnStyle}><FaPrint /> Stampa</button>
         <button onClick={handleSave} style={btnStyle}><FaSave  /> Salva</button>
-        <button onClick={()=>document.getElementById("load-input")!.click()} style={btnStyle}>
+        <label style={btnStyle as React.CSSProperties} className="force-button-label">
           <FaFolderOpen /> Carica
-        </button>
+          <input
+            type="file"
+            accept=".json"
+            onChange={handleLoad}
+            style={{ display: "none" }}
+          />
+        </label>
+
         <input id="load-input" type="file" accept=".json" onChange={handleLoad} style={{ display:"none" }}/>
         {/* Converti / Transpose */}
         <button onClick={convertAllItalian} style={btnStyle}>
