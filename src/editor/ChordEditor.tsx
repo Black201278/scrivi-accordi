@@ -28,6 +28,7 @@ interface Snapshot {
 }
 
 // —– Mappe e utilità —–
+const [showWelcome, setShowWelcome] = useState(true);
 const SCALE = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"];
 const FLAT_TO_SHARP: Record<string,string> = { Db:"C#", Eb:"D#", Gb:"F#", Ab:"G#", Bb:"A#" };
 const chordMap: Record<string,string> = {
@@ -394,6 +395,16 @@ export default function ChordEditor() {
   }
 
   return (
+    <>
+    {showWelcome && (
+      <div className="welcome-overlay" onClick={() => setShowWelcome(false)}>
+        <div className="welcome-box">
+          <h2>Benvenuto!</h2>
+          <p>Inizia importando un file DOCX oppure scrivi direttamente il testo e inserisci gli accordi.</p>
+          <p>Tocca o clicca per iniziare.</p>
+        </div>
+      </div>
+    )}
     <div className="chord-editor-container">
       {/* Sidebar desktop */}
       <aside className="desktop-sidebar">
