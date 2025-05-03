@@ -1,30 +1,20 @@
-import JSZip from "jszip";
+import mammoth from "mammoth";
 
 export async function loadDocx(file: File): Promise<string[]> {
   try {
     const arrayBuffer = await file.arrayBuffer();
-    if (!arrayBuffer || arrayBuffer.byteLength === 0) {
-      throw new Error("File vuoto o non leggibile.");
-    }
 
-    const zip = await JSZip.loadAsync(arrayBuffer);
-    const fileXml = zip.file("word/document.xml");
-    if (!fileXml) throw new Error("Documento DOCX non valido.");
+    const result = await mammoth.extractRawText({ arrayBuffer });
+    const text = result.value || "";
+    const lines = text
+      .split(/\r?\n/)
+      .map(line => line.trim())
+      .filter(line => line.length > 0);
 
-    const documentXml = await fileXml.async("string");
-    const parser = new DOMParser();
-    const xmlDoc = parser.parseFromString(documentXml, "application/xml");
-
-    const paras = Array.from(xmlDoc.getElementsByTagName("w:p"));
-    const texts = paras.map(p => {
-      const ts = Array.from(p.getElementsByTagName("w:t")).map(t => t.textContent || "");
-      return ts.join("");
-    });
-
-    return texts;
+    return lines;
   } catch (err) {
-    console.error("Errore durante il parsing del DOCX:", err);
-    alert("Errore durante il caricamento del file DOCX.\nProva da un altro browser o dispositivo.");
+    console.error("Errore durante il parsing DOCX con Mammoth:", err);
+    alert("Errore durante il caricamento del file DOCX.\nProva con un altro file o browser.");
     return [];
   }
 }
