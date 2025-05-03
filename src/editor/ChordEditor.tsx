@@ -369,7 +369,7 @@ export default function ChordEditor() {
           <FaFileWord /> Importa DOCX
           <input
             type="file"
-            accept=".docx"
+            accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
             onChange={handleFile}
             style={{ display: "none" }}
           />
