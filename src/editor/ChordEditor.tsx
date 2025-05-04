@@ -436,8 +436,13 @@ export default function ChordEditor() {
         - Tocco prolungato su un accordo = copia
 
         🗂️ Menu:
-        - Importa DOCX/TXT, salva, stampa, carica
-        - Converti accordi ITA/INT, trasponi
+        - Importa DOCX (solo vers. Desktop)
+        - Importa TXT (Desktop e Mobile), 
+        - salva (Crea un file tipo Json editabile), 
+        - carica (Carica un Json editabile)
+        - stampa (Crea versione stampabile)
+        - Converti accordi ITA/INT, 
+        - trasponi (+1,-1 aumenta o diminuisce di un semitono)
         `)}
           style={btnStyle}
         >
