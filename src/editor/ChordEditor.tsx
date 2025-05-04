@@ -70,6 +70,8 @@ export default function ChordEditor() {
   const [menuRoot,setMenuRoot] = useState<string|null>(null);
   const clickRef = useRef<{localX:number,localY:number}|null>(null);
   const [welcomeVisible, setWelcomeVisible] = useState(true);
+  const lastTapRef = useRef<{ [index: number]: number }>({});
+
 
 
   // mobile menu
@@ -105,6 +107,19 @@ export default function ChordEditor() {
     setBlocks(next.blocks);
     setPlaced(next.placed);
   };
+  const handleTouchStart = (e: React.TouchEvent, index: number) => {
+    const now = Date.now();
+    const lastTap = lastTapRef.current[index] || 0;
+    if (now - lastTap < 400) {
+      e.stopPropagation();
+      record();
+      setPlaced(ps => ps.filter((_, j) => j !== index));
+      lastTapRef.current[index] = 0;
+    } else {
+      lastTapRef.current[index] = now;
+    }
+  };
+  
 
   // Shortcut tastiera
   useEffect(() => {
@@ -517,7 +532,7 @@ export default function ChordEditor() {
                   setMovingIndex(i);
                 }}
                 onDoubleClick={onChordDoubleClick(i)}
-                onTouchStart={isTouchDevice ? handleTouchStart : undefined}
+                onTouchStart={isTouchDevice ? (e) => handleTouchStart(e, i) : undefined}
                 onContextMenu={handleChordContextMenu(c.chord)}
               >
                 {c.chord}
