@@ -115,19 +115,32 @@
 }
 .welcome-banner {
   position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
   background-color: #222;
   color: #fff;
-  padding: 12px;
-  text-align: center;
+  padding: 16px 24px;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.6);
   z-index: 1000;
-  animation: fadeOut 3s ease-in forwards;
+  cursor: pointer;
+  text-align: center;
 }
 
-@keyframes fadeOut {
-  0% { opacity: 1; }
-  80% { opacity: 1; }
-  100% { opacity: 0; display: none; }
+/* Evita a capo automatico e abilita scroll orizzontale */
+.editor-content p {
+  white-space: nowrap;
+  overflow-x: auto;
+  overflow-y: hidden;
+  text-overflow: clip;
+  font-size: 16px;
+  padding: 4px 8px;
+}
+
+/* Responsive: font leggermente più piccolo su mobile */
+@media (max-width: 600px) {
+  .editor-content p {
+    font-size: 14px;
+  }
 }

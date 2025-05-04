@@ -79,11 +79,9 @@ export default function ChordEditor() {
 
   // Auto‐save/Load
   useEffect(() => {
-    const timeout = setTimeout(() => {
-      setWelcomeVisible(false);
-    }, 3000);
-    return () => clearTimeout(timeout);
+    setWelcomeVisible(true);
   }, []);
+  
   
   // Undo/Redo
   const makeSnapshot = (): Snapshot => ({
@@ -405,6 +403,31 @@ export default function ChordEditor() {
           <p style={{ marginBottom:4 }}>WebApp creata da un Cantore per i Cantori</p>
           <p>© 2025 Fabio Bova</p>
         </div>
+              {/* Help Button */}
+        <button
+          onClick={() => alert(`💡 Guida Rapida:
+
+        🖥️ Desktop:
+        - Clic destro su riga vuota = inserisci accordo
+        - Doppio clic su un accordo = elimina
+        - Clic singolo su accordo = sposta
+        - Destro su accordo = copia
+        - Ctrl+Z / Ctrl+Y = Undo/Redo
+
+        📱 Mobile:
+        - Tocca prolungato una riga vuota = inserisci accordo
+        - Doppio tap su un accordo = elimina
+        - Tocca un accordo = sposta
+        - Tocco prolungato su un accordo = copia
+
+        🗂️ Menu:
+        - Importa DOCX/TXT, salva, stampa, carica
+        - Converti accordi ITA/INT, trasponi
+        `)}
+          style={btnStyle}
+        >
+          ❓ Help
+        </button>
       </>
     );
   }
@@ -413,10 +436,20 @@ export default function ChordEditor() {
   return (
     <>
       {welcomeVisible && (
-        <div className="welcome-banner">
-          🎵 Benvenuto in Scrivi-Accordi! Clicca sulle righe vuote per inserire accordi.
+        <div
+          className="welcome-banner"
+          onClick={() => setWelcomeVisible(false)}
+        >
+          <strong>🎵 Benvenuti in Scrivi Accordi</strong><br />
+          App creata da un Cantore per i Cantori<br />
+          <small style={{ fontSize: '0.9em', opacity: 0.8 }}>
+            © 2025 Fabio Bova
+          </small>
+          <br />
+          <br />
+          <em>Tocca per iniziare</em>
         </div>
-      )}
+)}
 
       <div className="chord-editor-container">
         {/* Sidebar desktop */}
